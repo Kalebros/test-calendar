@@ -1,2 +1,4 @@
+from .app import app
+
 def main() -> None:
-    print("Hello from baco-calendar!")
+    app()

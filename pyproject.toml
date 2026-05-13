@@ -8,7 +8,9 @@ authors = [
 ]
 requires-python = ">=3.11"
 dependencies = [
+    "arrow>=1.4.0",
     "loguru>=0.7.3",
+    "omegaconf>=2.3.0",
     "pydantic>=2.13.4",
     "typer>=0.25.1",
 ]
