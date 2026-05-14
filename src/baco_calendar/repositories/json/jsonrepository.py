@@ -3,11 +3,13 @@
 JSON file-based calendar repository implementation for baco-calendar.
 """
 
+from datetime import date
 import json
 from typing import Dict, Any, Optional, List
 from pathlib import Path
 
 from baco_calendar.calendardata.calendar import Calendar
+from baco_calendar.calendardata.entry import CalendarEntry
 from baco_calendar.repositories.abstract import CalendarRepository
 from baco_calendar.exceptions.calendarerror import CalendarConfigurationError, CalendarNotFoundError, CalendarRepositoryError
 
@@ -43,8 +45,8 @@ class JSONCalendarRepository(CalendarRepository):
             raise CalendarConfigurationError("Invalid configuration type for JSONCalendarRepository")
         
         self._configuration = configuration
-        if self._configuration.get('file_path') is None:
-            raise CalendarConfigurationError("Missing 'file_path' in configuration for JSONCalendarRepository")
+        if self._configuration.get('configuration', {}).get('file-path') is None:
+            raise CalendarConfigurationError("Missing 'file-path' in configuration for JSONCalendarRepository")
         
     def open(self) -> None:
         """
@@ -55,7 +57,7 @@ class JSONCalendarRepository(CalendarRepository):
             raise CalendarConfigurationError("Repository configuration is not set. Please configure the repository before opening.")
         
 
-        file_path = Path(self._configuration['file_path'])
+        file_path = Path(self._configuration['configuration']['file-path'])
         if file_path.exists() and not file_path.is_file():
             raise CalendarConfigurationError(f"Configured file path '{file_path}' is not a valid file.")
         if file_path.exists():
@@ -64,6 +66,12 @@ class JSONCalendarRepository(CalendarRepository):
                     data = json.load(f)
                     for cal_data in data.get('calendars', []):
                         calendar = Calendar(name=cal_data['name'], identifier=cal_data['identifier'])
+                        for entry_data in cal_data.get('entries', []):
+                            entry = CalendarEntry(
+                                entry_type=entry_data['entry_type'],
+                                entry_date=date.fromisoformat(entry_data['entry_date'])
+                            )
+                            calendar._entries.append(entry)
                         self._calendars[calendar.identifier] = calendar
                 self._is_open = True
             except json.JSONDecodeError as e:
@@ -79,14 +87,14 @@ class JSONCalendarRepository(CalendarRepository):
         """
         logger.info("Closing JSONCalendarRepository.")
 
-        file_path = Path(self._configuration['file_path'])
+        file_path = Path(self._configuration['configuration']['file-path'])
         try:
             for calendar in self._calendars.values():
                 calendar.get_entries()
             with file_path.open('w', encoding='utf-8') as f:
                 data = {
                     'calendars': [
-                        cal.to_dict() for cal in self._calendars.values()
+                        JSONCalendarRepository._parse_calendar_to_json(cal.to_dict()) for cal in self._calendars.values()
                     ]
                 }
                 json.dump(data, f, indent=4)
@@ -138,8 +146,6 @@ class JSONCalendarRepository(CalendarRepository):
         if calendar.identifier is None:
             calendar.identifier = self._generate_identifier()
         
-        calendar.get_entries()
-
         self._calendars[calendar.identifier] = calendar
         return calendar
     
@@ -154,3 +160,13 @@ class JSONCalendarRepository(CalendarRepository):
             raise CalendarNotFoundError(f"Calendar with identifier '{identifier}' not found in the repository.")
         
         del self._calendars[identifier]
+    
+    @classmethod
+    def _parse_calendar_to_json(cls, raw_calendar_data: dict) -> dict:
+        """
+        Convert a Calendar object to a JSON-serializable dictionary.
+        """
+        for entry in raw_calendar_data.get('entries', []):
+            if isinstance(entry.get('entry_date'), date):
+                entry['entry_date'] = entry['entry_date'].isoformat()
+        return raw_calendar_data
