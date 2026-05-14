@@ -57,56 +57,56 @@ class Calendar:
         """
         Add a new entry to the calendar.
         """
-        self._new_entries.append(entry)
+        if entry.entry_date not in [e.entry_date for e in self._entries]:
+            self._entries.append(entry)
+            self._new_entries.append(entry)
     
     def update_entry(self, entry: CalendarEntry) -> None:
         """
         Update an existing entry in the calendar.
         """
-        self._updated_entries.append(entry)
-    
+        actual_entry = next((e for e in self._entries if e.entry_date == entry.entry_date), None)
+        if actual_entry is not None:
+            self._entries.remove(actual_entry)
+            self._entries.append(entry)
+            self._updated_entries.append(entry)
+        else:
+            self._new_entries.append(entry)
+            self._entries.append(entry)
+
     def delete_entry(self, entry: CalendarEntry) -> None:
         """
         Delete an entry from the calendar.
         """
-        self._deleted_entries.append(entry)
-    
+        actual_entry = next((e for e in self._entries if e.entry_date == entry.entry_date), None)
+        if actual_entry is not None:
+            self._entries.remove(actual_entry)
+            self._deleted_entries.append(actual_entry)
+
     def get_entries(self) -> list[CalendarEntry]:
         """
         Get a list of all calendar entries, including new, updated, and deleted entries.
         """
-        return self._build_entry_list()
+        return Calendar._order_entries(self._entries)
     
     def get_updated_entries(self) -> list[CalendarEntry]:
         """
         Get a list of all updated entries.
         """
-        return deepcopy(self._updated_entries)
+        return Calendar._order_entries(self._updated_entries)
     
     def get_new_entries(self) -> list[CalendarEntry]:
         """
         Get a list of all new entries.
         """
-        return deepcopy(self._new_entries)
+        return Calendar._order_entries(self._new_entries)
     
     def get_deleted_entries(self) -> list[CalendarEntry]:
         """
         Get a list of all deleted entries.
         """
-        return deepcopy(self._deleted_entries)
-    
-    def _build_entry_list(self) -> list[CalendarEntry]:
-        """
-        Build the list of calendar entries by applying new, updated, and deleted entries to the existing entries.
-        """
-        entries = deepcopy(self._entries)
-        entries = [entry for entry in entries if entry not in self._deleted_entries]
-        entries = [entry for entry in entries if entry not in self._updated_entries
-                   and entry not in self._new_entries]
-        entries.extend(deepcopy(self._updated_entries))
-        entries.extend(deepcopy(self._new_entries))
-        return entries
-    
+        return Calendar._order_entries(self._deleted_entries)
+        
     def to_dict(self) -> dict:
         """
         Convert the calendar to a dictionary representation.
@@ -127,3 +127,20 @@ class Calendar:
             entry = CalendarEntry.model_validate(entry_data)
             calendar._entries.append(entry)
         return calendar
+    
+    def clean_up_entries(self) -> None:
+        """
+        Clear the lists of new, updated, and deleted entries after they have been processed.
+        """
+        self._new_entries.clear()
+        self._updated_entries.clear()
+        self._deleted_entries.clear()
+    
+    @classmethod
+    def _order_entries(cls, entries: list[CalendarEntry]) -> list[CalendarEntry]:
+        """
+        Order the entries by their date.
+        """
+        result = deepcopy(entries)
+        result.sort(key=lambda e: e.entry_date)
+        return result
