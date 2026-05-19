@@ -34,7 +34,9 @@ def fixture_json_repo_config(tmp_path) -> dict:
     file_path = tmp_path / "calendars.json"
     return {
         "type": "JSON",
-        "file_path": str(file_path)
+        "configuration": {
+            "file-path": str(file_path)
+        }
     }
 
 def test_json_repository_configuration(json_repo_config: dict) -> None:
